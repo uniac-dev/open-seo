@@ -1,0 +1,59 @@
+runtime: yaml
+resources:
+  storage-definition:
+    type: singleton
+    build:
+      dockerfile: storage/Dockerfile
+    memory_mib: 1024
+    env:
+      RUSTFS_ACCESS_KEY: openseo
+      RUSTFS_SECRET_KEY: REPLACE_WITH_RANDOM_STORAGE_SECRET
+    volumes:
+      - name: data
+        size_gb: 10
+        mount_path: /data
+  runtime-definition:
+    type: singleton
+    build:
+      dockerfile: runtime/Dockerfile
+    memory_mib: 2048
+    env:
+      CELLD_BUCKET: openseo
+      S3_ENDPOINT: http://${{storage.host}}:9000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${{storage.RUSTFS_ACCESS_KEY}}
+      AWS_SECRET_ACCESS_KEY: ${{storage.RUSTFS_SECRET_KEY}}
+      CELLD_MAX_RSS_MB: "1536"
+      CELLD_MAX_RESIDENT_CELLS: "64"
+      CELLD_V8_HEAP_LIMIT_MB: "256"
+      CELLD_MAX_REQUEST_BODY_BYTES: "33554432"
+      RUST_LOG: warn,cell_console=info
+      AUTH_MODE: password
+      BETTER_AUTH_URL: https://bootstrap.invalid
+      DATAFORSEO_API_KEY: ""
+      OPENROUTER_API_KEY: ""
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      CONTEXT_API_KEY: ""
+    volumes:
+      - name: state
+        size_gb: 5
+        mount_path: /state
+  web-definition:
+    type: service
+    build:
+      dockerfile: web/Dockerfile
+    env:
+      RUNTIME_HOST: ${{runtime.host}}
+  storage:
+    type: deployment
+    from: storage-definition
+    public_ports: []
+  runtime:
+    type: deployment
+    from: runtime-definition
+    public_ports: []
+  web:
+    type: deployment
+    from: web-definition
+    public_ports: []
